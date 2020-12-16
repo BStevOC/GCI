@@ -1,0 +1,323 @@
+library(gld)
+library(zoo)
+datos <- read.delim('clipboard')
+datos <- array(datos[,1])
+
+#-------------------------------------------------------------
+
+# Método L-moments
+
+example.fit <- fit.fkml(datos, "TL", return.data = T)
+plot(example.fit,one.page=FALSE)
+
+# Prueba de bondad de ajuste
+
+min_r <- min(datos)
+max_r <- max(datos)
+No_of_bins <- floor(1+3.3*log10(length(datos)))
+Bin_Width <- round((max_r-min_r)/No_of_bins,3)
+hk <- hist(datos,breaks=c(seq(min_r,max_r+Bin_Width,Bin_Width)))
+breaks_cdf <- pgl(hk$breaks,6.48306, 10.66943, 0.34782, -0.01254)
+null.probs <- rollapply(breaks_cdf, 2, function(x) x[2]-x[1])
+chisq.test(hk$counts, p=null.probs, rescale.p=TRUE, simulate.p.value=TRUE)
+
+
+# indices
+
+### Indice Cp (capacidad de proceso)
+
+lp <- qgl(0.00135, example.fit$lambda)
+up <- qgl(0.99865, example.fit$lambda)
+li <- 6.2
+ls <- 6.8
+cp <- (ls - li) / (up - lp)
+cp
+
+# bootstrap Cp
+
+boots <- function(datos, li = 6.2, ls = 6.8, R){
+  icp <- rep(0, R)
+  for (i in 1:R) {
+    muestra <- sample(datos, length(datos), replace = T)
+    fitted <- fit.fkml(muestra,"MSP")
+    lp <- qgl(0.00135, fitted$lambda)
+    up <- qgl(0.99865, fitted$lambda)
+    cp <- (ls - li) / (up - lp)
+    icp[i] <- cp
+  }
+  return(icp)
+}
+
+# Intervalo de confianza
+
+muestras <- boots(datos, R = 50)
+quantile(muestras, 0.05)
+quantile(muestras, 0.95)
+
+
+
+################################## indicador  Cpl
+
+
+lp <- qgl(0.00135, example.fit$lambda)
+up <- qgl(0.99865, example.fit$lambda)
+m  <- qgl(0.5, example.fit$lambda)
+li <- 6.2
+ls <- 6.8
+cpl <- (m - li) / (m - lp)
+cpl
+
+# bootstrap
+
+boots <- function(datos, li = 6.2, ls = 6.8, R){
+  icpl <- rep(0, R)
+  for (i in 1:R) {
+    muestra <- sample(datos, length(datos), replace = T)
+    fitted <- fit.fkml(muestra,"MSP")
+    lp <- qgl(0.00135, fitted$lambda)
+    up <- qgl(0.99865, fitted$lambda)
+    m  <- qgl(0.5, example.fit$lambda)
+    cpl <- (m - li) / (m - lp)
+    icpl[i] <- cpl
+  }
+  return(icpl)
+}
+
+# Intervalo de confianza
+
+muestrascpl <- boots(datos, R = 50)
+quantile(muestrascpl, 0.05)
+quantile(muestrascpl, 0.95)
+
+########
+
+
+############################### indicador Cpu
+
+lp <- qgl(0.00135, example.fit$lambda)
+up <- qgl(0.99865, example.fit$lambda)
+m  <- qgl(0.5, example.fit$lambda)
+li <- 6.2
+ls <- 6.8
+Cpu <- (ls - m) / (up - m)
+Cpu
+
+# bootstrap
+
+boots <- function(datos, li = 6.2, ls = 6.8, R){
+  icpu <- rep(0, R)
+  for (i in 1:R) {
+    muestra <- sample(datos, length(datos), replace = T)
+    fitted <- fit.fkml(muestra,"MSP")
+    lp <- qgl(0.00135, fitted$lambda)
+    up <- qgl(0.99865, fitted$lambda)
+    m  <- qgl(0.5, example.fit$lambda)
+    Cpu <- (ls - m) / (up - m)
+    icpu[i] <- Cpu
+  }
+  return(icpu)
+}
+
+# Intervalo de confianza
+
+muestrascpu <- boots(datos, R = 50)
+quantile(muestrascpu, 0.05)
+quantile(muestrascpu, 0.95)
+
+
+
+########### ######### ######### 
+
+Cpk<- min(cpl,Cpu)
+Cpk
+
+# bootstrap
+
+boots <- function(datos, li = 6.2, ls = 6.8, R){
+  icpk <- rep(0, R)
+  for (i in 1:R) {
+    muestra <- sample(datos, length(datos), replace = T)
+    fitted <- fit.fkml(muestra,"MSP")
+    lp <- qgl(0.00135, fitted$lambda)
+    up <- qgl(0.99865, fitted$lambda)
+    m  <- qgl(0.5, example.fit$lambda)
+    cpl <- (m - li) / (m - lp)
+    Cpu <- (ls - m) / (up - m)
+    cpk<-  min(cpl,Cpu)
+    icpk[i] <-cpk
+  }
+  return(icpk)
+}
+
+# Intervalo de confianza
+
+muestrascpk <- boots(datos, R = 50)
+quantile(muestrascpk, 0.05)
+quantile(muestrascpk, 0.95)
+
+par(mfrow = c(2, 2))
+hist(muestras, main="Histograma de muestras del indicador Cp",  ylab="Frecuencia", xlab="Cp")
+hist(muestrascpl, main = "Histograma de muestras del indicador Cpl", ylab="Frecuencia", xlab="Cpl" )
+hist(muestrascpu, main="Histograma de muestas del indicador Cpu", ylab="Frecuencia", xlab="Cpu")
+hist(muestrascpk, main = "Histogram de muestas del indicador Cpk",  ylab="Frecuencia", xlab="Cpk")
+
+#------------------------------------------------------------------------
+
+# Método MSP
+
+example.fit <- fit.fkml(datos, "MSP", return.data = T)
+example.fit
+
+
+# Prueba de bondad de ajuste
+
+min_r <- min(datos)
+max_r <- max(datos)
+No_of_bins <- floor(1+3.3*log10(length(datos)))
+Bin_Width <- round((max_r-min_r)/No_of_bins,3)
+hk <- hist(datos,breaks=c(seq(min_r,max_r+Bin_Width,Bin_Width)))
+breaks_cdf <- pgl(hk$breaks,6.48579, 11.22927, 0.24801, -0.04163)
+null.probs <- rollapply(breaks_cdf, 2, function(x) x[2]-x[1])
+chisq.test(hk$counts, p=null.probs, rescale.p=TRUE, simulate.p.value=TRUE)
+
+
+
+# indices
+
+### Indice Cp (capacidad de proceso)
+
+lp <- qgl(0.00135, example.fit$lambda)
+up <- qgl(0.99865, example.fit$lambda)
+li <- 6.2
+ls <- 6.8
+cp <- (ls - li) / (up - lp)
+cp
+
+# bootstrap Cp
+
+boots <- function(datos, li = 6.2, ls = 6.8, R){
+  icp <- rep(0, R)
+  for (i in 1:R) {
+    muestra <- sample(datos, length(datos), replace = T)
+    fitted <- fit.fkml(muestra,"TL")
+    lp <- qgl(0.00135, fitted$lambda)
+    up <- qgl(0.99865, fitted$lambda)
+    cp <- (ls - li) / (up - lp)
+    icp[i] <- cp
+  }
+  return(icp)
+}
+
+# Intervalo de confianza
+
+muestras <- boots(datos, R = 50)
+quantile(muestras, 0.05)
+quantile(muestras, 0.95)
+
+
+
+################################## indicador  Cpl
+
+lp <- qgl(0.00135, example.fit$lambda)
+up <- qgl(0.99865, example.fit$lambda)
+m  <- qgl(0.5, example.fit$lambda)
+li <- 6.2
+ls <- 6.8
+cpl <- (m - li) / (m - lp)
+cpl
+
+# bootstrap
+
+boots <- function(datos, li = 6.2, ls = 6.8, R){
+  icpl <- rep(0, R)
+  for (i in 1:R) {
+    muestra <- sample(datos, length(datos), replace = T)
+    fitted <- fit.fkml(muestra,"TL")
+    lp <- qgl(0.00135, fitted$lambda)
+    up <- qgl(0.99865, fitted$lambda)
+    m  <- qgl(0.5, example.fit$lambda)
+    cpl <- (m - li) / (m - lp)
+    icpl[i] <- cpl
+  }
+  return(icpl)
+}
+
+# Intervalo de confianza
+
+muestrascpl <- boots(datos, R = 50)
+quantile(muestrascpl, 0.05)
+quantile(muestrascpl, 0.95)
+
+########
+
+
+############################### indicador Cpu
+
+lp <- qgl(0.00135, example.fit$lambda)
+up <- qgl(0.99865, example.fit$lambda)
+m  <- qgl(0.5, example.fit$lambda)
+li <- 6.2
+ls <- 6.8
+Cpu <- (ls - m) / (up - m)
+Cpu
+
+# bootstrap
+
+boots <- function(datos, li = 6.2, ls = 6.8, R){
+  icpu <- rep(0, R)
+  for (i in 1:R) {
+    muestra <- sample(datos, length(datos), replace = T)
+    fitted <- fit.fkml(muestra,"TL")
+    lp <- qgl(0.00135, fitted$lambda)
+    up <- qgl(0.99865, fitted$lambda)
+    m  <- qgl(0.5, example.fit$lambda)
+    Cpu <- (ls - m) / (up - m)
+    icpu[i] <- Cpu
+  }
+  return(icpu)
+}
+
+# Intervalo de confianza
+
+muestrascpu <- boots(datos, R = 50)
+quantile(muestrascpu, 0.05)
+quantile(muestrascpu, 0.95)
+
+##################
+
+########### ######### ######### 
+
+Cpk<- min(cpl,Cpu)
+Cpk
+
+# bootstrap
+
+boots <- function(datos, li = 6.2, ls = 6.8, R){
+  icpk <- rep(0, R)
+  for (i in 1:R) {
+    muestra <- sample(datos, length(datos), replace = T)
+    fitted <- fit.fkml(muestra,"TL")
+    lp <- qgl(0.00135, fitted$lambda)
+    up <- qgl(0.99865, fitted$lambda)
+    m  <- qgl(0.5, example.fit$lambda)
+    cpl <- (m - li) / (m - lp)
+    Cpu <- (ls - m) / (up - m)
+    cpk<-  min(cpl,Cpu)
+    icpk[i] <-cpk
+  }
+  return(icpk)
+}
+
+# Intervalo de confianza
+
+muestrascpk <- boots(datos, R = 50)
+quantile(muestrascpk, 0.05)
+quantile(muestrascpk, 0.95)
+
+
+par(mfrow = c(2, 2))
+hist(muestras, main="Histograma de muestras del indicador Cp",  ylab="Frecuencia", xlab="Cp")
+hist(muestrascpl, main = "Histograma de muestras del indicador Cpl", ylab="Frecuencia", xlab="Cpl" )
+hist(muestrascpu, main="Histograma de muestas del indicador Cpu", ylab="Frecuencia", xlab="Cpu")
+hist(muestrascpk, main = "Histogram de muestas del indicador Cpk",  ylab="Frecuencia", xlab="Cpk")
+
